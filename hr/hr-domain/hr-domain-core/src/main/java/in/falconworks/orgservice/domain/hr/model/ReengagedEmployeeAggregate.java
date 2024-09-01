@@ -2,15 +2,16 @@ package in.falconworks.orgservice.domain.hr.model;
 
 import in.falconworks.orgservice.domain.common.model.Address;
 import in.falconworks.orgservice.domain.common.model.AggregateRoot;
+import in.falconworks.orgservice.domain.common.model.PositionId;
 import in.falconworks.orgservice.domain.common.model.UserId;
 import in.falconworks.orgservice.domain.establishment.model.Position;
+import in.falconworks.orgservice.domain.hr.event.*;
 import in.falconworks.orgservice.domain.hr.exception.EmployeeValidationException;
-
 import java.time.LocalDate;
 import java.util.logging.Logger;
 
 @SuppressWarnings("FieldCanBeLocal")
-public class ReengageEmployeeAggregate implements AggregateRoot {
+public class ReengagedEmployeeAggregate implements AggregateRoot {
     private final UserId userId;
     private final PersonName personName;
     private ContactDetails contactDetails;
@@ -22,11 +23,19 @@ public class ReengageEmployeeAggregate implements AggregateRoot {
     private final Logger logger = Logger.getLogger(getClass().getName());
 
     //Expire reengagement contract
-    public void expireContract() {
+    public ContractExpiredEvent expireContract() {
         logger.info("Expiring contract for reengaged employee "+userId+" ("+personName.getFullName()+")");
         if (!currentContractDetail.contractExpired()) {
             currentContractDetail = new CurrentContractDetail(currentContractDetail.startDateOfCurrentContract(), LocalDate.now());
         }
+        validate();
+        ContractExpiryData contractExpiryData = ContractExpiryData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .designation(lastDesignationBeforeRetirement)
+                .contractExpiryDate(LocalDate.now()).build();
+        return new ContractExpiredEvent(contractExpiryData);
     }
 
     //Get date of attaining maximum allowable age for reengagement
@@ -34,69 +43,71 @@ public class ReengageEmployeeAggregate implements AggregateRoot {
         return dateOfBirth.plusYears(CurrentContractDetail.MAX_AGE_FOR_REENGAGEMENT_VALIDITY);
     }
 
-    //Get date of reengagement contract expiry
-    public LocalDate dateOfCurrentContractExpiry() {
-        return currentContractDetail.dateOfCurrentContractExpiry();
-    }
-
     //Get current reengagement status
     public boolean contractExpired() {
         return currentContractDetail.contractExpired();
     }
 
-    public UserId getUserId() {
-        return this.userId;
-    }
-
-    public String getFullName() {
-        return personName.getFullName();
-    }
-
-    public String getMobileNumber() {
-        return contactDetails.mobile();
-    }
-
-    public String getEmail() {
-        return contactDetails.email();
-    }
-
-    public Address getAddress() {
-        return contactDetails.address();
-    }
-
-    public Position getCurrentPosition() {
-        return currentPosition;
-    }
-
-    public void updatePosition(Position newPosition) {
+    public PositionChangedEvent updatePosition(Position newPosition) {
         logger.info("Updating position for reengaged employee "+userId+" ("+personName.getFullName()+")");
+        PositionId lastPositionId = currentPosition.getPositionId();
         this.currentPosition = newPosition;
         validate();
+        PositionChangeData positionChangeData = PositionChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .newPositionId(newPosition.getPositionId())
+                .lastPositionId(lastPositionId)
+                .dateOfPositionChange(LocalDate.now())
+                .build();
+        return new PositionChangedEvent(positionChangeData);
     }
 
     public LocalDate getRetirementDate() {
         return this.retirementDetail.dateOfRetirement();
     }
 
-    public void updateMobile(String newMobileNumber) {
+    public MobileNumberChangedEvent updateMobile(String newMobileNumber) {
         logger.info("Updating mobile number for reengaged employee "+userId+" ("+personName.getFullName()+")");
         this.contactDetails = new ContactDetails(newMobileNumber, contactDetails.email(),
                 contactDetails.address());
         validate();
+        ContactDetailsChangeData contactDetailsChangeData = ContactDetailsChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .newContactDetails(this.contactDetails)
+                .build();
+        return new MobileNumberChangedEvent(contactDetailsChangeData);
     }
 
-    public void updateEmail(String newEmail) {
+    public EmailChangedEvent updateEmail(String newEmail) {
         logger.info("Updating email for reengaged employee "+userId+" ("+personName.getFullName()+")");
         this.contactDetails = new ContactDetails(contactDetails.mobile(), newEmail,
                 contactDetails.address());
         validate();
+        ContactDetailsChangeData contactDetailsChangeData = ContactDetailsChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .newContactDetails(this.contactDetails)
+                .build();
+        return new EmailChangedEvent(contactDetailsChangeData);
     }
 
-    public void updateAddress(Address newAddress) {
+    public AddressChangedEvent updateAddress(Address newAddress) {
         logger.info("Updating address for reengaged employee "+userId+" ("+personName.getFullName()+")");
         this.contactDetails = new ContactDetails(contactDetails.mobile(), contactDetails.email(),
                 newAddress);
         validate();
+        ContactDetailsChangeData contactDetailsChangeData = ContactDetailsChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .newContactDetails(this.contactDetails)
+                .build();
+        return new AddressChangedEvent(contactDetailsChangeData);
     }
 
     public ReengagedEmployeeState getState() {
@@ -105,9 +116,9 @@ public class ReengageEmployeeAggregate implements AggregateRoot {
                 .firstName(personName.firstName())
                 .lastName(personName.lastName())
                 .dateOfBirth(dateOfBirth)
-                .address(getAddress())
-                .email(getEmail())
-                .mobile(getMobileNumber())
+                .address(contactDetails.address())
+                .email(contactDetails.email())
+                .mobile(contactDetails.mobile())
                 .lastDesignation(lastDesignationBeforeRetirement)
                 .position(currentPosition)
                 .dateOfRetirement(getRetirementDate())
@@ -116,8 +127,12 @@ public class ReengageEmployeeAggregate implements AggregateRoot {
                 .build();
     }
 
+    public ReengagedEmployeeCreatedEvent validateAndInitialize() {
+        validate();
+        return new ReengagedEmployeeCreatedEvent(getState());
+    }
 
-    public void validate() {
+    private void validate() {
         if (userId == null) {
             throw new EmployeeValidationException("Employee must have valid user id");
         }
@@ -173,7 +188,7 @@ public class ReengageEmployeeAggregate implements AggregateRoot {
         }
     }
 
-    private ReengageEmployeeAggregate(Builder builder) {
+    private ReengagedEmployeeAggregate(Builder builder) {
         userId = builder.userId;
         personName = new PersonName(builder.firstName, builder.lastName);
         dateOfBirth = builder.dateOfBirth;
@@ -262,8 +277,8 @@ public class ReengageEmployeeAggregate implements AggregateRoot {
             return this;
         }
 
-        public  ReengageEmployeeAggregate build() {
-            return new ReengageEmployeeAggregate(this);
+        public ReengagedEmployeeAggregate build() {
+            return new ReengagedEmployeeAggregate(this);
         }
     }
 }

@@ -69,4 +69,17 @@ public class Position {
             return new Position(this);
         }
     }
+
+    public PositionId getPositionId() {
+        return positionId;
+    }
+
+    public String getPositionIdentifier() {
+        return positionIdentifier;
+    }
+
+    public String getPositionDescription() {
+        return positionDescription;
+    }
+
 }

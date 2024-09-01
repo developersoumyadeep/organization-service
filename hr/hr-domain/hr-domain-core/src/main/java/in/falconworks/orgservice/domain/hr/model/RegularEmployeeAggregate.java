@@ -2,11 +2,14 @@ package in.falconworks.orgservice.domain.hr.model;
 
 import in.falconworks.orgservice.domain.common.model.Address;
 import in.falconworks.orgservice.domain.common.model.AggregateRoot;
+import in.falconworks.orgservice.domain.common.model.PositionId;
 import in.falconworks.orgservice.domain.common.model.UserId;
 import in.falconworks.orgservice.domain.establishment.model.Position;
+import in.falconworks.orgservice.domain.hr.event.*;
 import in.falconworks.orgservice.domain.hr.exception.EmployeeValidationException;
 
 import java.time.LocalDate;
+import java.time.Period;
 import java.util.logging.Logger;
 
 @SuppressWarnings("FieldCanBeLocal")
@@ -14,78 +17,100 @@ public class RegularEmployeeAggregate implements AggregateRoot {
     private final UserId userId;
     private final PersonName personName;
     private final LocalDate dateOfBirth;
+    private final LocalDate dateOfJoiningAtService;
     private ContactDetails contactDetails;
     private Designation currentDesignation;
     private Position currentPosition;
     private RetirementDetail retirementDetail;
     private final Logger logger = Logger.getLogger(getClass().getName());
 
-
-    public UserId getUserId() {
-        return this.userId;
-    }
-
-    public String getFullName() {
-        return personName.getFullName();
-    }
-
-    public void updateDesignation(Designation newDesignation) {
+    public DesignationChangedEvent updateDesignation(Designation newDesignation) {
         logger.info("Updating designation for regular employee "+userId+" ("+personName.getFullName()+")");
+        Designation lastDesignation = currentDesignation;
         this.currentDesignation = newDesignation;
         validate();
+        DesignationChangeData data = DesignationChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .lastDesignation(lastDesignation)
+                .newDesignation(newDesignation)
+                .dateOfDesignationChange(LocalDate.now())
+                .build();
+        return new DesignationChangedEvent(data);
     }
 
-    public void updatePosition(Position newPosition) {
+    public PositionChangedEvent updatePosition(Position newPosition) {
         logger.info("Updating position for regular employee "+userId+" ("+personName.getFullName()+")");
+        PositionId lastPositionId = currentPosition.getPositionId();
         this.currentPosition = newPosition;
         validate();
+        PositionChangeData positionChangeData = PositionChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .newPositionId(newPosition.getPositionId())
+                .lastPositionId(lastPositionId)
+                .dateOfPositionChange(LocalDate.now())
+                .build();
+        return new PositionChangedEvent(positionChangeData);
     }
 
-    public void executeRetirement() {
+    public EmployeeRetiredEvent executeRetirement() {
         logger.info("Executing retirement action on employee "+userId+" ("+personName.getFullName()+")");
         this.retirementDetail = new RetirementDetail(true, LocalDate.now());
         validate();
+        EmployeeRetirementData data = EmployeeRetirementData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .dateOfRetirement(retirementDetail.dateOfRetirement())
+                .designationBeforeRetirement(currentDesignation)
+                .yearOfService(Period.between(dateOfJoiningAtService, retirementDetail.dateOfRetirement()).getYears())
+                .build();
+        return new EmployeeRetiredEvent(data);
     }
 
-    public boolean isRetired() {
-        return this.retirementDetail.isRetired();
-    }
-
-    public LocalDate getRetirementDate() {
-        return this.retirementDetail.dateOfRetirement();
-    }
-
-    public String getMobileNumber() {
-        return contactDetails.mobile();
-    }
-
-    public String getEmail() {
-        return contactDetails.email();
-    }
-
-    public Address getAddress() {
-        return contactDetails.address();
-    }
-
-    public void updateMobile(String newMobileNumber) {
+    public MobileNumberChangedEvent updateMobile(String newMobileNumber) {
         logger.info("Updating mobile number for regular employee "+userId+" ("+personName.getFullName()+")");
         this.contactDetails = new ContactDetails(newMobileNumber, contactDetails.email(),
                 contactDetails.address());
         validate();
+        ContactDetailsChangeData contactDetailsChangeData = ContactDetailsChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .newContactDetails(this.contactDetails)
+                .build();
+        return new MobileNumberChangedEvent(contactDetailsChangeData);
     }
 
-    public void updateEmail(String newEmail) {
+    public EmailChangedEvent updateEmail(String newEmail) {
         logger.info("Updating email for regular employee "+userId+" ("+personName.getFullName()+")");
         this.contactDetails = new ContactDetails(contactDetails.mobile(), newEmail,
                 contactDetails.address());
         validate();
+        ContactDetailsChangeData contactDetailsChangeData = ContactDetailsChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .newContactDetails(this.contactDetails)
+                .build();
+        return new EmailChangedEvent(contactDetailsChangeData);
     }
 
-    public void updateAddress(Address newAddress) {
+    public AddressChangedEvent updateAddress(Address newAddress) {
         logger.info("Updating address for regular employee "+userId+" ("+personName.getFullName()+")");
         this.contactDetails = new ContactDetails(contactDetails.mobile(), contactDetails.email(),
                 newAddress);
         validate();
+        ContactDetailsChangeData contactDetailsChangeData = ContactDetailsChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .newContactDetails(this.contactDetails)
+                .build();
+        return new AddressChangedEvent(contactDetailsChangeData);
     }
 
     public RegularEmployeeState getState() {
@@ -94,22 +119,28 @@ public class RegularEmployeeAggregate implements AggregateRoot {
                 .firstName(personName.firstName())
                 .lastName(personName.lastName())
                 .dateOfBirth(dateOfBirth)
-                .address(getAddress())
-                .email(getEmail())
-                .mobile(getMobileNumber())
+                .dateOfJoiningAtService(dateOfJoiningAtService)
+                .address(contactDetails.address())
+                .email(contactDetails.email())
+                .mobile(contactDetails.mobile())
                 .designation(currentDesignation)
                 .position(currentPosition)
-                .isRetired(isRetired())
-                .dateOfRetirement(getRetirementDate())
+                .isRetired(retirementDetail.isRetired())
+                .dateOfRetirement(retirementDetail.dateOfRetirement())
                 .build();
     }
 
     @Override
     public String toString() {
-        return getFullName()+","+currentDesignation.name();
+        return personName.getFullName()+","+currentDesignation.name();
     }
 
-    public void validate() {
+    public RegularEmployeeCreatedEvent validateAndInitialize() {
+        validate();
+        return new RegularEmployeeCreatedEvent(getState());
+    }
+
+    private void validate() {
         if (userId == null) {
             throw new EmployeeValidationException("Employee must have valid user id");
         }
@@ -126,7 +157,7 @@ public class RegularEmployeeAggregate implements AggregateRoot {
     private void validateRetirementStatus() {
         logger.info("Validating retirement status");
         if ((LocalDate.now().isAfter(dateOfBirth.plusYears(60)) ||
-                LocalDate.now().isEqual(dateOfBirth.plusYears(60))) && !isRetired()) {
+                LocalDate.now().isEqual(dateOfBirth.plusYears(60))) && !retirementDetail.isRetired()) {
             throw new EmployeeValidationException("Employee of age 60 and above should be retired");
         }
         logger.info("Retirement status validated");
@@ -159,6 +190,7 @@ public class RegularEmployeeAggregate implements AggregateRoot {
         userId = builder.userId;
         personName = new PersonName(builder.firstName, builder.lastName);
         dateOfBirth = builder.dateOfBirth;
+        dateOfJoiningAtService = builder.dateOfJoiningAtService;
         contactDetails = new ContactDetails(builder.mobile, builder.email, builder.address);
         currentDesignation = builder.designation;
         currentPosition = builder.position;
@@ -175,6 +207,7 @@ public class RegularEmployeeAggregate implements AggregateRoot {
         private String firstName;
         private String lastName;
         private LocalDate dateOfBirth;
+        private LocalDate dateOfJoiningAtService;
         private Address address;
         private String mobile;
         private String email;
@@ -203,6 +236,11 @@ public class RegularEmployeeAggregate implements AggregateRoot {
 
         public Builder dateOfBirth(LocalDate dateOfBirth) {
             this.dateOfBirth = dateOfBirth;
+            return this;
+        }
+
+        public Builder dateOfJoiningAtService(LocalDate dateOfJoiningAtService) {
+            this.dateOfJoiningAtService = dateOfJoiningAtService;
             return this;
         }
 

@@ -12,6 +12,7 @@ public class RegularEmployeeState {
     private final String firstName;
     private final String lastName;
     private final LocalDate dateOfBirth;
+    private final LocalDate dateOfJoiningAtService;
     private final Address address;
     private final String mobile;
     private final String email;
@@ -25,6 +26,7 @@ public class RegularEmployeeState {
         firstName = builder.firstName;
         lastName = builder.lastName;
         dateOfBirth = builder.dateOfBirth;
+        dateOfJoiningAtService = builder.dateOfJoiningAtService;
         address = builder.address;
         mobile = builder.mobile;
         email = builder.email;
@@ -43,6 +45,7 @@ public class RegularEmployeeState {
         private String firstName;
         private String lastName;
         private LocalDate dateOfBirth;
+        private LocalDate dateOfJoiningAtService;
         private Address address;
         private String mobile;
         private String email;
@@ -71,6 +74,11 @@ public class RegularEmployeeState {
 
         public Builder dateOfBirth(LocalDate val) {
             dateOfBirth = val;
+            return this;
+        }
+
+        public Builder dateOfJoiningAtService(LocalDate dateOfJoiningAtService) {
+            this.dateOfJoiningAtService = dateOfJoiningAtService;
             return this;
         }
 
@@ -156,5 +164,9 @@ public class RegularEmployeeState {
 
     public LocalDate getDateOfRetirement() {
         return dateOfRetirement;
+    }
+
+    public LocalDate getDateOfJoiningAtService() {
+        return dateOfJoiningAtService;
     }
 }

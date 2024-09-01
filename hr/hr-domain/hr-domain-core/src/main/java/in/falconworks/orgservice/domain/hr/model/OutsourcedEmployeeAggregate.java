@@ -4,6 +4,10 @@ import in.falconworks.orgservice.domain.common.model.Address;
 import in.falconworks.orgservice.domain.common.model.AggregateRoot;
 import in.falconworks.orgservice.domain.common.model.UserId;
 import in.falconworks.orgservice.domain.establishment.model.Position;
+import in.falconworks.orgservice.domain.hr.event.AddressChangedEvent;
+import in.falconworks.orgservice.domain.hr.event.EmailChangedEvent;
+import in.falconworks.orgservice.domain.hr.event.MobileNumberChangedEvent;
+import in.falconworks.orgservice.domain.hr.event.OutsourcedEmployeeCreatedEvent;
 import in.falconworks.orgservice.domain.hr.exception.EmployeeValidationException;
 
 import java.time.LocalDate;
@@ -19,53 +23,46 @@ public class OutsourcedEmployeeAggregate implements AggregateRoot {
     private final UserId vendorId;
     private final Logger logger = Logger.getLogger(getClass().getName());
 
-
-    public String getFullName() {
-        return personName.getFullName();
-    }
-
-    public Position getCurrentPosition() {
-        return currentPosition;
-    }
-    public UserId getVendorId() {
-        return this.vendorId;
-    }
-
-    public LocalDate getDateOfBirth() {
-        return this.dateOfBirth;
-    }
-
-    public String getMobileNumber() {
-        return contactDetails.mobile();
-    }
-
-    public String getEmail() {
-        return contactDetails.email();
-    }
-
-    public Address getAddress() {
-        return contactDetails.address();
-    }
-
-    public void updateMobile(String newMobileNumber) {
+    public MobileNumberChangedEvent updateMobile(String newMobileNumber) {
         logger.info("Updating mobile number of outsourced employee "+userId+" ("+personName.getFullName()+")");
         this.contactDetails = new ContactDetails(newMobileNumber, contactDetails.email(),
                 contactDetails.address());
         validate();
+        ContactDetailsChangeData contactDetailsChangeData = ContactDetailsChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .newContactDetails(this.contactDetails)
+                .build();
+        return new MobileNumberChangedEvent(contactDetailsChangeData);
     }
 
-    public void updateEmail(String newEmail) {
+    public EmailChangedEvent updateEmail(String newEmail) {
         logger.info("Updating email of outsourced employee "+userId+" ("+personName.getFullName()+")");
         this.contactDetails = new ContactDetails(contactDetails.mobile(), newEmail,
                 contactDetails.address());
         validate();
+        ContactDetailsChangeData contactDetailsChangeData = ContactDetailsChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .newContactDetails(this.contactDetails)
+                .build();
+        return new EmailChangedEvent(contactDetailsChangeData);
     }
 
-    public void updateAddress(Address newAddress) {
+    public AddressChangedEvent updateAddress(Address newAddress) {
         logger.info("Updating address of outsourced employee "+userId+" ("+personName.getFullName()+")");
         this.contactDetails = new ContactDetails(contactDetails.mobile(), contactDetails.email(),
                 newAddress);
         validate();
+        ContactDetailsChangeData contactDetailsChangeData = ContactDetailsChangeData.builder()
+                .userId(userId)
+                .firstName(personName.firstName())
+                .lastName(personName.lastName())
+                .newContactDetails(this.contactDetails)
+                .build();
+        return new AddressChangedEvent(contactDetailsChangeData);
     }
 
     public OutsourcedEmployeeState getState() {
@@ -74,15 +71,20 @@ public class OutsourcedEmployeeAggregate implements AggregateRoot {
                 .firstName(personName.firstName())
                 .lastName(personName.lastName())
                 .dateOfBirth(dateOfBirth)
-                .address(getAddress())
-                .email(getEmail())
-                .mobile(getMobileNumber())
+                .address(contactDetails.address())
+                .email(contactDetails.email())
+                .mobile(contactDetails.mobile())
                 .position(currentPosition)
                 .vendorId(vendorId)
                 .build();
     }
 
-    public void validate() {
+    public OutsourcedEmployeeCreatedEvent validateAndInitiate() {
+        validate();
+        return new OutsourcedEmployeeCreatedEvent(getState());
+    }
+
+    private void validate() {
         if (userId == null) {
             throw new EmployeeValidationException("Outsourced employee must have valid user id");
         }
