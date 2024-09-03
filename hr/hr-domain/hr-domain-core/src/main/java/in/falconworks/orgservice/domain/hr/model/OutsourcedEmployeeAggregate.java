@@ -3,7 +3,6 @@ package in.falconworks.orgservice.domain.hr.model;
 import in.falconworks.orgservice.domain.common.model.Address;
 import in.falconworks.orgservice.domain.common.model.AggregateRoot;
 import in.falconworks.orgservice.domain.common.model.UserId;
-import in.falconworks.orgservice.domain.establishment.model.Position;
 import in.falconworks.orgservice.domain.hr.event.AddressChangedEvent;
 import in.falconworks.orgservice.domain.hr.event.EmailChangedEvent;
 import in.falconworks.orgservice.domain.hr.event.MobileNumberChangedEvent;
@@ -91,8 +90,19 @@ public class OutsourcedEmployeeAggregate implements AggregateRoot {
         logger.info("Validating outsourced employee with id "+userId);
         personName.validate();
         validateDateOfBirth();
+        validateCurrentPosition();
         contactDetails.validate();
         logger.info("Outsourced employee "+userId+" successfully validated");
+    }
+
+    private void validateCurrentPosition() {
+        logger.info("Validating current position");
+        if (currentPosition.isVacant()) {
+            throw new EmployeeValidationException("Employee position found vacant. It should have been filled up by the employee");
+        }
+        if (!currentPosition.getEmployeeUserId().get().equals(userId)) {
+            throw new EmployeeValidationException("Employee position is filled up with incorrect user id");
+        }
     }
 
     private void validateDateOfBirth() {
@@ -114,6 +124,7 @@ public class OutsourcedEmployeeAggregate implements AggregateRoot {
         dateOfBirth = builder.dateOfBirth;
         contactDetails = new ContactDetails(builder.mobile, builder.email, builder.address);
         currentPosition = builder.position;
+        currentPosition.fillPosition(userId);
         vendorId = builder.vendorId;
     }
     

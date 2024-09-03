@@ -1,8 +1,11 @@
-package in.falconworks.orgservice.domain.establishment.model;
+package in.falconworks.orgservice.domain.hr.model;
 
 import in.falconworks.orgservice.domain.common.model.PositionId;
-import in.falconworks.orgservice.domain.establishment.exception.PositionValidationException;
+import in.falconworks.orgservice.domain.common.model.UserId;
+import in.falconworks.orgservice.domain.hr.exception.PositionValidationException;
 
+
+import java.util.Optional;
 import java.util.logging.Logger;
 
 public class Position {
@@ -10,12 +13,14 @@ public class Position {
     private final String positionIdentifier;
     private final String positionDescription;
     private boolean isChairPosition;
+    private UserId employeeUserId;
     private final Logger logger = Logger.getLogger(getClass().getName());
 
     private Position(Builder builder) {
         positionId = builder.positionId;
         positionIdentifier = builder.positionIdentifier;
         positionDescription = builder.positionDescription;
+        employeeUserId = builder.employeeUserId;
         validate();
     }
 
@@ -28,6 +33,22 @@ public class Position {
             throw new PositionValidationException("Position must have valid description and identifier");
         }
         logger.info("Position "+positionId+" ("+positionIdentifier+") validated");
+    }
+
+    public void fillPosition(UserId emoployeeUserId) {
+        this.employeeUserId = emoployeeUserId;
+    }
+
+    public Optional<UserId> getEmployeeUserId() {
+        return employeeUserId == null ? Optional.empty() : Optional.of(employeeUserId);
+    }
+
+    public boolean isVacant() {
+        return employeeUserId == null;
+    }
+
+    public void vacatePosition() {
+        this.employeeUserId = null;
     }
 
     public void setAsChairPosition(boolean setAsChair) {
@@ -46,6 +67,7 @@ public class Position {
         private PositionId positionId;
         private String positionIdentifier;
         private String positionDescription;
+        private UserId employeeUserId;
 
         private Builder() {
         }
@@ -62,6 +84,11 @@ public class Position {
 
         public Builder positionDescription(String val) {
             positionDescription = val;
+            return this;
+        }
+
+        public Builder employeeUserId(UserId aUserId) {
+            this.employeeUserId = aUserId;
             return this;
         }
 

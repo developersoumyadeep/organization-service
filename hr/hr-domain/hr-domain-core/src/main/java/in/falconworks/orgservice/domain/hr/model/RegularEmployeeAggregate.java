@@ -4,7 +4,6 @@ import in.falconworks.orgservice.domain.common.model.Address;
 import in.falconworks.orgservice.domain.common.model.AggregateRoot;
 import in.falconworks.orgservice.domain.common.model.PositionId;
 import in.falconworks.orgservice.domain.common.model.UserId;
-import in.falconworks.orgservice.domain.establishment.model.Position;
 import in.falconworks.orgservice.domain.hr.event.*;
 import in.falconworks.orgservice.domain.hr.exception.EmployeeValidationException;
 
@@ -149,9 +148,20 @@ public class RegularEmployeeAggregate implements AggregateRoot {
         validateDateOfBirth();
         validateDesignation();
         contactDetails.validate();
+        validateCurrentPosition();
         retirementDetail.validate();
         validateRetirementStatus();
         logger.info("Regular employee "+userId+" ("+personName.getFullName()+") validated");
+    }
+
+    private void validateCurrentPosition() {
+        logger.info("Validating current position");
+        if (currentPosition.isVacant()) {
+            throw new EmployeeValidationException("Employee position found vacant. It should have been filled up by the employee");
+        }
+        if (!currentPosition.getEmployeeUserId().get().equals(userId)) {
+            throw new EmployeeValidationException("Employee position is filled up with incorrect user id");
+        }
     }
 
     private void validateRetirementStatus() {
@@ -194,6 +204,7 @@ public class RegularEmployeeAggregate implements AggregateRoot {
         contactDetails = new ContactDetails(builder.mobile, builder.email, builder.address);
         currentDesignation = builder.designation;
         currentPosition = builder.position;
+        currentPosition.fillPosition(userId);
         retirementDetail = new RetirementDetail(builder.isRetired, builder.dateOfRetirement);
     }
 

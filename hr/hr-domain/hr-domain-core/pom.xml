@@ -17,9 +17,5 @@
             <groupId>in.falconworks</groupId>
             <artifactId>common</artifactId>
         </dependency>
-        <dependency>
-            <groupId>in.falconworks</groupId>
-            <artifactId>establishment-domain-core</artifactId>
-        </dependency>
     </dependencies>
 </project>

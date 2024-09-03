@@ -4,7 +4,6 @@ import in.falconworks.orgservice.domain.common.model.Address;
 import in.falconworks.orgservice.domain.common.model.AggregateRoot;
 import in.falconworks.orgservice.domain.common.model.PositionId;
 import in.falconworks.orgservice.domain.common.model.UserId;
-import in.falconworks.orgservice.domain.establishment.model.Position;
 import in.falconworks.orgservice.domain.hr.event.*;
 import in.falconworks.orgservice.domain.hr.exception.EmployeeValidationException;
 import java.time.LocalDate;
@@ -51,6 +50,8 @@ public class ReengagedEmployeeAggregate implements AggregateRoot {
     public PositionChangedEvent updatePosition(Position newPosition) {
         logger.info("Updating position for reengaged employee "+userId+" ("+personName.getFullName()+")");
         PositionId lastPositionId = currentPosition.getPositionId();
+        this.currentPosition.vacatePosition();
+        newPosition.fillPosition(this.userId);
         this.currentPosition = newPosition;
         validate();
         PositionChangeData positionChangeData = PositionChangeData.builder()
@@ -132,6 +133,10 @@ public class ReengagedEmployeeAggregate implements AggregateRoot {
         return new ReengagedEmployeeCreatedEvent(getState());
     }
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
     private void validate() {
         if (userId == null) {
             throw new EmployeeValidationException("Employee must have valid user id");
@@ -140,11 +145,22 @@ public class ReengagedEmployeeAggregate implements AggregateRoot {
         personName.validate();
         validateDateOfBirth();
         validateDesignation();
+        validateCurrentPosition();
         contactDetails.validate();
         retirementDetail.validate();
         validateRetirementStatus();
         validateReengagementStatus();
         logger.info("Reengaged employee "+userId+" successfully validated");
+    }
+
+    private void validateCurrentPosition() {
+        logger.info("Validating current position");
+        if (currentPosition.isVacant()) {
+            throw new EmployeeValidationException("Employee position found vacant. It should have been filled up by the employee");
+        }
+        if (!currentPosition.getEmployeeUserId().get().equals(userId)) {
+            throw new EmployeeValidationException("Employee position is filled up with incorrect user id");
+        }
     }
 
     private void validateReengagementStatus() {
@@ -195,6 +211,7 @@ public class ReengagedEmployeeAggregate implements AggregateRoot {
         contactDetails = new ContactDetails(builder.mobile, builder.email, builder.address);
         lastDesignationBeforeRetirement = builder.lastDesignation;
         currentPosition = builder.position;
+        currentPosition.fillPosition(userId);
         retirementDetail = new RetirementDetail(true, builder.dateOfRetirement);
         currentContractDetail = new CurrentContractDetail(builder.startDateOfCurrentContract, builder.dateOfCurrentContractExpiry);
     }

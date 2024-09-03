@@ -2,7 +2,6 @@ package in.falconworks.orgservice.domain.hr.model;
 
 import in.falconworks.orgservice.domain.common.model.Address;
 import in.falconworks.orgservice.domain.common.model.UserId;
-import in.falconworks.orgservice.domain.establishment.model.Position;
 
 import java.time.LocalDate;
 
