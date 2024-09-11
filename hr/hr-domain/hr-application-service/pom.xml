@@ -12,4 +12,11 @@
 
     <artifactId>hr-application-service</artifactId>
 
+    <dependencies>
+        <dependency>
+            <groupId>in.falconworks</groupId>
+            <artifactId>hr-domain-core</artifactId>
+        </dependency>
+    </dependencies>
+
 </project>
